@@ -1,0 +1,42 @@
+version: '3'
+
+services: #listing all the services
+  source_postgres:  #posgres serivce (source)
+    image: postgres:9.2
+    ports:
+      - "5433:5432"
+    networks: #network on which our containers will run
+      - elt_network
+    environment: #setting env variables
+      - POSTGRES_DB: source_db
+      - POSTGRES_USER: postgres
+      - POSTGRES_PASSWORD: secret
+    volumes: #setting volumes and initial sql files; also mapping it to the docker volume
+      - ./source_db_init/init.sql:/docker-entrypoint-initdb.d/init.sql
+
+  destination_postgres:  #posgres serivce (source)
+    image: postgres:9.2
+    ports:
+      - "5434:5432"
+    networks: #network on which our container will run
+      - elt_network
+    environment: #setting env variables
+      - POSTGRES_DB: destination_db
+      - POSTGRES_USER: postgres
+      - POSTGRES_PASSWORD: secret
+
+
+  elt_script: #service to let docker know what we want to do with data; also to allow script to run automatically
+    build:
+      context: ./elt_script #where file is located
+      dockerfile: Dockerfile
+    command: [ "python", "elt_script.py" ] #command to run python
+    networks:
+      - elt_network
+    depends_on: #only run this service if source_postgres and destination_postgres runs
+      - source_postgres 
+      - destination_postgres
+
+networks:
+  elt_network:
+    driver: bridge
