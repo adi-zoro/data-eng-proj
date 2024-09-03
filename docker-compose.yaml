@@ -14,12 +14,14 @@ services: #listing all the services
     volumes: #setting volumes and initial sql files; also mapping it to the docker volume
       - ./source_db_init/init.sql:/docker-entrypoint-initdb.d/init.sql
 
-  destination_postgres:  #posgres serivce (source)
+  destination_postgres:  #postgres serivce (source)
     image: postgres:9.2
     ports:
       - "5434:5432"
     networks: #network on which our container will run
       - elt_network
+    depends_on:
+      - source_postgres
     environment: #setting env variables
        POSTGRES_DB: destination_db
        POSTGRES_USER: postgres
@@ -36,6 +38,30 @@ services: #listing all the services
     depends_on: #only run this service if source_postgres and destination_postgres runs
       - source_postgres 
       - destination_postgres
+
+  dbt:
+    image: ghcr.io/dbt-labs/dbt-postgres:1.4.7
+    command:
+      [
+        "run",
+        "--profiles-dir",
+        "/root",
+        "--project-dir",
+        "/dbt",
+        "--full-refresh"
+      ]
+    networks:
+      - elt_network
+    volumes:
+      - ./custom_postgres:/dbt
+      - ~/.dbt:/root
+    depends_on:
+      - elt_script
+    environment:
+      DBT_PROFILE: default
+      DBT_TARGET: dev
+    extra_hosts:
+      - host.docker.internal:host-gateway
 
 networks:
   elt_network:
